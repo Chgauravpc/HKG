@@ -93,7 +93,11 @@ EDGES:
   implements   — feature → sub-goal it directly realises (NOT the top-level goal directly,
                  unless the feature has no sub-goal). The sub_goal_of chain carries
                  the connection upward to the top-level goal automatically.
-  governs      — design_decision → feature it constrains (layer-crossing)
+  governs      — design_decision → every feature it constrains (layer-crossing).
+                 Read the spec to determine scope. If the decision applies to
+                 multiple features, draw a governs edge to each one individually.
+                 Never assume a design decision governs only one feature unless
+                 the spec explicitly scopes it that way.
   feeds_data_to — A feeds_data_to B means data flows FROM A INTO B.
                  A is the producer. B is the consumer.
                  Only draw feeds_data_to edges between feature nodes you have
@@ -130,7 +134,6 @@ Feature specification:
 {spec}
 ---
 """
-
 
 # ── LLM extraction via Groq ───────────────────────────────────────────────────
 

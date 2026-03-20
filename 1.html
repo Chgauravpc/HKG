@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --border: #1e1e2e;
+    --l1: #7c6af7;
+    --l1-dim: #3d3578;
+    --l2: #2dd4bf;
+    --l2-dim: #165f58;
+    --l3: #f97316;
+    --l3-dim: #7a380b;
+    --text: #e2e2f0;
+    --muted: #6b6b8a;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--surface);
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 20px; }
+
+  .legend { display: flex; gap: 18px; }
+
+  .legend-item {
+    display: flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap;
+  }
+
+  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  .load-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--muted);
+    font-family: var(--mono); font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .load-btn:hover { border-color: var(--l2); color: var(--l2); }
+  #file-input { display: none; }
+
+  #filename {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--l2); display: none;
+  }
+
+  #drop-overlay {
+    position: absolute; inset: 0;
+    background: rgba(10,10,15,0.88);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+
+  #drop-overlay.active { opacity: 1; pointer-events: all; }
+
+  .drop-box {
+    border: 2px dashed var(--l2);
+    border-radius: 12px;
+    padding: 48px 64px;
+    text-align: center;
+  }
+
+  .drop-box p { font-family: var(--mono); font-size: 14px; color: var(--l2); }
+  .drop-box span { font-size: 11px; color: var(--muted); margin-top: 8px; display: block; }
+
+  #empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; pointer-events: none;
+  }
+
+  #empty-state p { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  #empty-state span { font-size: 11px; color: #2e2e44; }
+
+  #canvas { flex: 1; position: relative; overflow: hidden; }
+  svg { width: 100%; height: 100%; }
+
+  .node-group { cursor: pointer; }
+  .node-ring { fill: none; stroke-width: 1; opacity: 0.22; }
+  .node-circle { stroke-width: 1.5; transition: filter 0.15s; }
+  .node-group:hover .node-circle { filter: brightness(1.4); }
+
+  .node-label {
+    font-family: var(--sans); font-size: 11px; font-weight: 400;
+    fill: var(--text); pointer-events: none; text-anchor: middle;
+  }
+
+  .node-id {
+    font-family: var(--mono); font-size: 9px;
+    fill: var(--muted); pointer-events: none; text-anchor: middle;
+  }
+
+  .link { fill: none; stroke-width: 1; opacity: 0.3; }
+  .link.layer-crossing { stroke-dasharray: 4 3; opacity: 0.5; }
+
+  .link-label {
+    font-family: var(--mono); font-size: 9px;
+    fill: var(--muted); pointer-events: none; text-anchor: middle;
+  }
+
+  #tooltip {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+    max-width: 260px; z-index: 10;
+  }
+
+  #tooltip.visible { opacity: 1; }
+
+  .tt-type {
+    font-family: var(--mono); font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px;
+  }
+
+  .tt-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 8px; line-height: 1.4; }
+
+  .tt-layer {
+    display: inline-block; padding: 2px 7px; border-radius: 3px;
+    font-family: var(--mono); font-size: 10px; font-weight: 500; margin-bottom: 8px;
+  }
+
+  .tt-meta { font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 1.8; white-space: pre; }
+
+  .controls {
+    position: absolute; bottom: 20px; right: 20px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  .ctrl-btn {
+    width: 32px; height: 32px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--muted);
+    font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; font-family: var(--mono);
+  }
+
+  .ctrl-btn:hover { border-color: var(--text); color: var(--text); }
+
+  .stats {
+    position: absolute; bottom: 20px; left: 24px;
+    font-family: var(--mono); font-size: 10px; color: var(--muted); line-height: 2;
+  }
+
+  #error-msg {
+    position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    background: #3a0f0f; border: 1px solid #7a1f1f; color: #f87171;
+    font-family: var(--mono); font-size: 11px;
+    padding: 8px 16px; border-radius: 4px;
+    display: none; z-index: 30;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Knowledge Graph Visualizer</h1>
+  <div class="header-right">
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#7c6af7"></div>Layer 1 · Intent</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#2dd4bf"></div>Layer 2 · Feature</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Layer 3 · Design</div>
+    </div>
+    <label class="load-btn">
+      ↑ Load graph.json
+      <input type="file" id="file-input" accept=".json">
+    </label>
+    <span id="filename"></span>
+  </div>
+</header>
+
+<div id="canvas">
+  <svg id="svg"></svg>
+
+  <div id="empty-state">
+    <p>Drop graph.json here or click "Load graph.json"</p>
+    <span>python 1.py --json-only --out graph.json</span>
+  </div>
+
+  <div id="drop-overlay">
+    <div class="drop-box">
+      <p>Drop graph.json to load</p>
+      <span>nodes · edges · layer-crossing</span>
+    </div>
+  </div>
+
+  <div id="tooltip">
+    <div class="tt-type" id="tt-type"></div>
+    <div class="tt-label" id="tt-label"></div>
+    <div class="tt-layer" id="tt-layer"></div>
+    <div class="tt-meta" id="tt-meta"></div>
+  </div>
+
+  <div id="error-msg"></div>
+  <div class="stats" id="stats"></div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="zoom-in">+</button>
+    <button class="ctrl-btn" id="zoom-out">−</button>
+    <button class="ctrl-btn" id="reset">⌂</button>
+  </div>
+</div>
+
+<script>
+const COLOR = { 1: "#7c6af7", 2: "#2dd4bf", 3: "#f97316" };
+const DIM   = { 1: "#3d3578", 2: "#165f58", 3: "#7a380b" };
+const LAYER_NAME = { 1: "Layer 1 · Intent", 2: "Layer 2 · Feature", 3: "Layer 3 · Design" };
+
+const canvasEl   = document.getElementById("canvas");
+const tooltip    = document.getElementById("tooltip");
+const emptyState = document.getElementById("empty-state");
+const statsEl    = document.getElementById("stats");
+const errorEl    = document.getElementById("error-msg");
+
+const svg = d3.select("#svg");
+const g   = svg.append("g");
+
+const defs = svg.append("defs");
+[1,2,3].forEach(l => {
+  defs.append("marker")
+    .attr("id", `arrow-l${l}`)
+    .attr("viewBox","0 0 10 10").attr("refX",20).attr("refY",5)
+    .attr("markerWidth",6).attr("markerHeight",6).attr("orient","auto-start-reverse")
+    .append("path").attr("d","M2 1L8 5L2 9").attr("fill","none")
+    .attr("stroke", COLOR[l]).attr("stroke-width",1.5)
+    .attr("stroke-linecap","round").attr("stroke-linejoin","round");
+});
+
+const zoom = d3.zoom().scaleExtent([0.2, 4]).on("zoom", e => g.attr("transform", e.transform));
+svg.call(zoom);
+
+document.getElementById("zoom-in").onclick  = () => svg.transition().duration(250).call(zoom.scaleBy, 1.3);
+document.getElementById("zoom-out").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 0.77);
+document.getElementById("reset").onclick    = () => svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+
+let sim = null;
+
+function showError(msg) {
+  errorEl.textContent = msg;
+  errorEl.style.display = "block";
+  setTimeout(() => errorEl.style.display = "none", 4000);
+}
+
+function renderGraph(data) {
+  if (!data.nodes || !data.edges) { showError("Invalid JSON — missing nodes or edges"); return; }
+
+  g.selectAll("*").remove();
+  if (sim) sim.stop();
+  emptyState.style.display = "none";
+
+  const nodes = data.nodes.map(n => ({ ...n }));
+  const nodeById = {};
+  nodes.forEach(n => nodeById[n.id] = n);
+
+  const links = data.edges.map(e => ({ ...e, source: e.from, target: e.to }));
+
+  const W = canvasEl.clientWidth;
+  const H = canvasEl.clientHeight;
+
+  // Links
+  const linkEl = g.append("g").selectAll("line")
+    .data(links).enter().append("line")
+    .attr("class", d => `link${d.layer_crossing ? " layer-crossing" : ""}`)
+    .attr("stroke", d => {
+      const src = nodeById[typeof d.source === "object" ? d.source.id : d.source];
+      return COLOR[src ? src.layer : 1];
+    })
+    .attr("marker-end", d => {
+      const src = nodeById[typeof d.source === "object" ? d.source.id : d.source];
+      return `url(#arrow-l${src ? src.layer : 1})`;
+    });
+
+  // Link labels
+  const linkLabelEl = g.append("g").selectAll("text")
+    .data(links).enter().append("text")
+    .attr("class","link-label")
+    .text(d => d.relationship);
+
+  // Nodes
+  const nodeEl = g.append("g").selectAll(".node-group")
+    .data(nodes).enter().append("g")
+    .attr("class","node-group")
+    .call(d3.drag()
+      .on("start", (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag",  (event, d) => { d.fx=event.x; d.fy=event.y; })
+      .on("end",   (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx=null; d.fy=null; })
+    )
+    .on("mouseover", (event, d) => {
+      document.getElementById("tt-type").textContent  = d.type.replace(/_/g," ");
+      document.getElementById("tt-label").textContent = d.label;
+      const layerEl = document.getElementById("tt-layer");
+      layerEl.textContent    = LAYER_NAME[d.layer];
+      layerEl.style.background = DIM[d.layer];
+      layerEl.style.color      = COLOR[d.layer];
+      const conns = data.edges.filter(e => e.from === d.id || e.to === d.id);
+      document.getElementById("tt-meta").textContent =
+        `id: ${d.id}\nconnections: ${conns.length}\nstale: ${d.stale}`;
+      tooltip.classList.add("visible");
+    })
+    .on("mousemove", event => {
+      tooltip.style.left = (event.offsetX + 16) + "px";
+      tooltip.style.top  = (event.offsetY - 10) + "px";
+    })
+    .on("mouseout", () => tooltip.classList.remove("visible"));
+
+  nodeEl.append("circle").attr("class","node-ring").attr("r", 30)
+    .attr("stroke", d => COLOR[d.layer]);
+
+  nodeEl.append("circle").attr("class","node-circle").attr("r", 22)
+    .attr("fill", d => DIM[d.layer]).attr("stroke", d => COLOR[d.layer]);
+
+  nodeEl.each(function(d) {
+    const words = d.label.split(" ");
+    const lines = [];
+    let line = "";
+    words.forEach(w => {
+      const test = line ? line + " " + w : w;
+      if (test.length > 15 && line) { lines.push(line); line = w; }
+      else line = test;
+    });
+    if (line) lines.push(line);
+    const totalH = lines.length * 13;
+    lines.forEach((l, i) => {
+      d3.select(this).append("text").attr("class","node-label")
+        .attr("y", -totalH/2 + i*13 + 6).text(l);
+    });
+    d3.select(this).append("text").attr("class","node-id").attr("y", 34).text(d.id);
+  });
+
+  sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id)
+      .distance(d => d.layer_crossing ? 170 : 110).strength(0.55))
+    .force("charge", d3.forceManyBody().strength(-450))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collide", d3.forceCollide(58))
+    .force("layer", d3.forceY(d => ({ 1: H*0.2, 2: H*0.5, 3: H*0.8 }[d.layer])).strength(0.4));
+
+  sim.on("tick", () => {
+    linkEl
+      .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    linkLabelEl
+      .attr("x", d => (d.source.x + d.target.x) / 2)
+      .attr("y", d => (d.source.y + d.target.y) / 2 - 4);
+    nodeEl.attr("transform", d => `translate(${d.x},${d.y})`);
+  });
+
+  const crossing = data.edges.filter(e => e.layer_crossing).length;
+  statsEl.innerHTML = `nodes: ${nodes.length}<br>edges: ${data.edges.length}<br>layer-crossing: ${crossing}`;
+
+  svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity.translate(W*0.05, 0).scale(0.92));
+}
+
+function loadFile(file) {
+  if (!file || !file.name.endsWith(".json")) { showError("Please select a .json file"); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      renderGraph(JSON.parse(e.target.result));
+      document.getElementById("filename").textContent = file.name;
+      document.getElementById("filename").style.display = "inline";
+    } catch(err) { showError("Failed to parse JSON: " + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById("file-input").addEventListener("change", function() {
+  loadFile(this.files[0]);
+  this.value = "";
+});
+
+canvasEl.addEventListener("dragover", e => {
+  e.preventDefault();
+  document.getElementById("drop-overlay").classList.add("active");
+});
+canvasEl.addEventListener("dragleave", e => {
+  if (!canvasEl.contains(e.relatedTarget))
+    document.getElementById("drop-overlay").classList.remove("active");
+});
+canvasEl.addEventListener("drop", e => {
+  e.preventDefault();
+  document.getElementById("drop-overlay").classList.remove("active");
+  loadFile(e.dataTransfer.files[0]);
+});
+
+window.addEventListener("resize", () => { if (sim) sim.alpha(0.2).restart(); });
+</script>
+</body>
+</html>

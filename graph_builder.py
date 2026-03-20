@@ -26,8 +26,18 @@ def validate_edges(
     allowed_relationships = {
         "implements", "governs", "depends_on", "sub_goal_of"
     }
+    seen_edges: set[tuple[str, str, str]] = set()
 
     for edge in edges:
+        # 0. Duplicate check
+        edge_key = (edge.from_id, edge.to_id, edge.relationship)
+        if edge_key in seen_edges:
+            warnings.append(
+                f"SKIP: duplicate edge {edge.from_id} --[{edge.relationship}]--> {edge.to_id}"
+            )
+            continue
+        seen_edges.add(edge_key)
+
         # 1. Both nodes must exist
         if edge.from_id not in node_ids:
             warnings.append(f"SKIP: unknown source '{edge.from_id}'")
@@ -65,6 +75,13 @@ def validate_edges(
             warnings.append(
                 f"SKIP: governs must come from L3, "
                 f"got L{from_layer} ({edge.from_id})"
+            )
+            continue
+
+        if edge.relationship == "governs" and to_layer != 2:
+            warnings.append(
+                f"SKIP: governs must target L2, "
+                f"got L{to_layer} ({edge.to_id})"
             )
             continue
 

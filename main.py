@@ -1,7 +1,7 @@
 """
 main.py — CLI entry point for the hierarchical knowledge graph system.
 
-Runs entity extraction, graph construction, and temporal demo.
+Runs entity extraction and graph construction.
 """
 
 from __future__ import annotations

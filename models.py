@@ -113,6 +113,13 @@ class KnowledgeGraph:
         )
 
     def add_edge(self, edge: GraphEdge) -> None:
+        # Duplicate guard — skip if same (from, to, relationship) exists
+        for existing in self._edges:
+            if (existing.from_id == edge.from_id
+                    and existing.to_id == edge.to_id
+                    and existing.relationship == edge.relationship):
+                return
+
         # auto-set layer_crossing
         src = self.get_node(edge.from_id)
         dst = self.get_node(edge.to_id)

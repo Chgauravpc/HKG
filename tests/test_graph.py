@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from models import GraphNode, GraphEdge, KnowledgeGraph, NodeType, Relationship
 from extractor import ExtractedEntity, ExtractedEdge
 from graph_builder import build_graph
-from temporal import TemporalGraph, TemporalNode, TemporalState
+
 
 
 # ── Test Fixtures ──────────────────────────────────────────────────────────────
@@ -182,79 +182,6 @@ class TestExtractionPrecision:
         assert layers == {1, 2, 3}, f"Not all layers represented: {layers}"
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Part 5: Temporal Propagation
-# ══════════════════════════════════════════════════════════════════════════════
-
-class TestTemporalPropagation:
-    """Verify temporal staleness tracking and propagation."""
-
-    def test_mark_stale_records_history(self):
-        graph, _ = _build_test_graph()
-        tgraph = TemporalGraph(graph=graph)
-
-        tgraph.mark_stale(
-            "design_stateless_scorer",
-            reason="Contract violated",
-            trigger="metrics.py changed",
-            propagate=False,
-        )
-
-        tn = tgraph.temporal_nodes["design_stateless_scorer"]
-        assert tn.is_stale()
-        assert len(tn.history) == 1
-        assert tn.history[0].stale is True
-        assert tn.history[0].trigger == "metrics.py changed"
-
-    def test_mark_fresh_after_stale(self):
-        graph, _ = _build_test_graph()
-        tgraph = TemporalGraph(graph=graph)
-
-        tgraph.mark_stale("design_stateless_scorer", "broken", "edit", propagate=False)
-        tgraph.mark_fresh("design_stateless_scorer", "reverted")
-
-        tn = tgraph.temporal_nodes["design_stateless_scorer"]
-        assert not tn.is_stale()
-        assert len(tn.history) == 2
-        assert tn.history[1].stale is False
-
-    def test_propagation_marks_connected_nodes(self):
-        graph, _ = _build_test_graph()
-        tgraph = TemporalGraph(graph=graph)
-
-        affected = tgraph.mark_stale(
-            "design_stateless_scorer",
-            reason="Contract violated",
-            trigger="metrics.py changed",
-            propagate=True,
-        )
-
-        # At minimum the source itself should be affected
-        assert "design_stateless_scorer" in affected
-        # Should propagate to at least one connected node
-        assert len(affected) >= 1
-
-    def test_history_grows_with_multiple_changes(self):
-        graph, _ = _build_test_graph()
-        tgraph = TemporalGraph(graph=graph)
-
-        tgraph.mark_stale("design_stateless_scorer", "broken", "edit1", propagate=False)
-        tgraph.mark_fresh("design_stateless_scorer", "fix1")
-        tgraph.mark_stale("design_stateless_scorer", "broken again", "edit2", propagate=False)
-
-        tn = tgraph.temporal_nodes["design_stateless_scorer"]
-        assert len(tn.history) == 3
-
-    def test_full_state_export(self):
-        graph, _ = _build_test_graph()
-        tgraph = TemporalGraph(graph=graph)
-        tgraph.mark_stale("design_stateless_scorer", "test", "test", propagate=False)
-
-        state = tgraph.get_full_state()
-        assert "design_stateless_scorer" in state
-        assert state["design_stateless_scorer"]["current_stale"] is True
-        assert len(state["design_stateless_scorer"]["history"]) == 1
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Runner
@@ -267,7 +194,6 @@ def run_all_tests():
         TestLayerAssignment,
         TestEdgeCorrectness,
         TestExtractionPrecision,
-        TestTemporalPropagation,
     ]
 
     total = 0

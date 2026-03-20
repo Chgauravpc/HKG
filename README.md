@@ -1,0 +1,277 @@
+# Hierarchical Knowledge Graph (HKG) — Session Convergence Scoring
+
+A Python system that extracts entities from natural-language feature specifications using an LLM and assembles them into a **Layers 1–3 hierarchical knowledge graph** backed by **NetworkX**.
+
+---
+
+## Table of Contents
+
+- [Architecture Overview](#architecture-overview)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Usage](#usage)
+- [Module Reference](#module-reference)
+  - [models.py](#modelspy)
+  - [extractor.py](#extractorpy)
+  - [graph_builder.py](#graph_builderpy)
+  - [main.py](#mainpy)
+- [Schema Reference](#schema-reference)
+- [How Entity Extraction Works](#how-entity-extraction-works)
+- [How Graph Construction Works](#how-graph-construction-works)
+- [Testing](#testing)
+- [Example Output](#example-output)
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    main.py (CLI)                        │
+│  ┌───────────┐   ┌──────────────┐                       │
+│  │ extractor  │──▶│ graph_builder │                       │
+│  │  (Groq)   │   │  (NetworkX)  │                       │
+│  └───────────┘   └──────────────┘                       │
+│        │                │                               │
+│   feature_spec    graph_output.json                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Data flow:**
+1. `extractor.py` sends the feature spec to **Groq** (llama-3.3-70b-versatile) and receives structured nodes, edges, and reasoning
+2. `graph_builder.py` validates the LLM-generated structural edges and commits them to a **NetworkX DiGraph**
+3. `main.py` orchestrates the pipeline and writes `graph_output.json`
+
+---
+
+## Project Structure
+
+```
+knowledge_graph/
+├── .env               # Groq API key (GROQ_API_KEY=...)
+├── models.py          # Dataclass schema + NetworkX-backed KnowledgeGraph
+├── extractor.py       # LLM-based entity extraction via Groq API
+├── graph_builder.py   # Edge inference engine (Layers 1-3)
+├── main.py            # CLI entry point — runs all 3 parts
+├── feature_spec.txt   # Input feature specification
+├── graph_output.json  # Generated graph (after running main.py)
+└── tests/
+    └── test_graph.py  # 14 automated tests
+```
+
+---
+
+## Installation
+
+### Prerequisites
+
+- Python 3.9+
+- A Groq API key ([get one here](https://console.groq.com/keys))
+
+### Install Dependencies
+
+```bash
+pip install networkx groq python-dotenv
+```
+
+---
+
+## Configuration
+
+The Groq API key is stored in `.env`:
+
+```env
+GROQ_API_KEY=gsk_your_key_here
+```
+
+The `extractor.py` module loads this automatically via `python-dotenv`.
+
+---
+
+## Usage
+
+### Run the Full Pipeline
+
+```bash
+cd knowledge_graph
+python main.py
+```
+
+This will:
+1. **Extract entities** from `feature_spec.txt` using the Groq LLM
+2. **Build the graph** with inferred edges and write `graph_output.json`
+
+### Run Tests Only (no API key needed)
+
+```bash
+python tests/test_graph.py
+```
+
+---
+
+## Module Reference
+
+### `models.py`
+
+Core data structures for the knowledge graph.
+
+| Class | Description |
+|---|---|
+| `NodeType` | Enum: `goal`, `feature`, `design_decision` |
+| `Relationship` | Enum: `implements`, `governs`, `depends_on`, `sub_goal_of` |
+| `GraphNode` | Dataclass — one node with `id`, `layer`, `type`, `label`, `stale`, `stale_reason`, `last_modified`, `connected_to` |
+| `GraphEdge` | Dataclass — one directed edge with `from_id`, `to_id`, `relationship`, `layer_crossing` |
+| `KnowledgeGraph` | NetworkX DiGraph wrapper with `add_node()`, `add_edge()`, `get_node()`, `neighbors()`, `shortest_path()`, `subgraph_by_layer()`, `to_json()` |
+
+**Key method signatures:**
+
+```python
+graph.add_node(GraphNode(...))
+graph.add_edge(GraphEdge(...))       # auto-computes layer_crossing
+graph.neighbors("node_id")           # → list[str]
+graph.shortest_path("src", "dst")    # → list[str]
+graph.subgraph_by_layer(2)           # → nx.DiGraph (only L2 nodes)
+graph.to_json(indent=2)              # → schema-conformant JSON string
+graph.info()                         # → "KnowledgeGraph: N nodes, M edges, density=X"
+```
+
+### `extractor.py`
+
+LLM-based entity extraction using the Groq API.
+
+| Function | Description |
+|---|---|
+| `extract_entities(spec: str)` | Send spec to Groq, return `(entities, edges, reasoning)` |
+
+**Model:** `llama-3.3-70b-versatile` via Groq API  
+**Temperature:** 0.1 (deterministic)  
+**Output:** Structured JSON with `nodes[]`, `edges[]`, and `reasoning{}`
+
+Each node (entity) contains:
+- `id` — snake_case identifier
+- `layer` — 1 (Intent), 2 (Feature), or 3 (Design)
+- `type` — `goal`, `feature`, or `design_decision`
+- `label` — human-readable name
+
+Each edge contains:
+- `from` — source node ID
+- `to` — target node ID
+- `relationship` — `implements`, `governs`, `depends_on`, `sub_goal_of`
+
+### `graph_builder.py`
+
+Constructs the graph using the exact nodes and edges generated by the LLM, enforcing a strict structural validation step before committing them.
+
+| Function | Description |
+|---|---|
+| `validate_edges(edges, entities)` | Prevents LLM hallucinations (unknown IDs, bad relationships, self-loops, layer coherence) |
+| `build_graph(entities, edges)` | Builds `KnowledgeGraph` from validated LLM output |
+| `print_graph_summary(graph)` | Print node/edge counts, cross-layer stats |
+
+**Structural Validation Rules:**
+To ensure graph integrity against non-deterministic LLM output, `validate_edges` drops edges that violate these domain-agnostic rules:
+- **Existence checks:** Source and target nodes must exist in the extracted entities list.
+- **Schema compliance:** Relationship must be one of `implements`, `governs`, `depends_on`, `sub_goal_of`.
+- **Acyclicity:** No self-loops allowed.
+- **Layer Coherence:**
+  - `sub_goal_of` MUST be L1 → L1.
+  - `implements` MUST originate from L2.
+  - `governs` MUST originate from L3.
+
+### `main.py`
+
+CLI entry point that runs all parts sequentially:
+
+1. Reads `feature_spec.txt`
+2. Calls `extract_entities()` → prints entities with reasoning
+3. Calls `build_graph()` → writes `graph_output.json`
+
+---
+
+## Schema Reference
+
+### Node Schema
+
+```json
+{
+  "id": "unique_identifier",
+  "layer": 1,
+  "type": "goal | feature | design_decision",
+  "label": "human readable name",
+  "stale": false,
+  "stale_reason": null,
+  "last_modified": "ISO 8601 timestamp",
+  "connected_to": ["node_ids"]
+}
+```
+
+### Edge Schema
+
+```json
+{
+  "from": "source_node_id",
+  "to": "target_node_id",
+  "relationship": "implements | governs | depends_on | sub_goal_of",
+  "layer_crossing": true
+}
+```
+
+---
+
+## How Entity Extraction Works
+
+The extractor sends the feature spec to Groq's `llama-3.3-70b-versatile` model with a highly structured prompt that:
+
+1. Defines the 3-layer taxonomy (Intent → Features → Design)
+2. Defines the exact structural edges allowed (`implements`, `governs`, `feeds_data_to`, `sub_goal_of`)
+3. Instructs the LLM to extract the precise list of nodes and structurally wire them via edges
+4. Instructs the LLM to provide its analytical reasoning in a separate dictionary parameter
+
+The prompt uses `response_format={"type": "json_object"}` to guarantee valid JSON output (`nodes`, `edges`, `reasoning`).
+
+---
+
+## How Graph Construction Works
+
+After the LLM completes the extraction pass, the graph builder:
+
+1. **Creates nodes** directly from the LLM `entities` array.
+2. **Validates edges** via a strict structural sieve (`validate_edges()`) that catches common LLM hallucinations before they corrupt the graph. It intercepts:
+   - Undefined `from_id` or `to_id` nodes.
+   - Relationships outside the allowed enum.
+   - Self-loops (`A → A`).
+   - Layer coherence violations (e.g., a "sub_goal_of" edge originating in Layer 3).
+3. **Commits valid edges** to the graph while auto-computing the `layer_crossing` boolean flag on every edge.
+
+The exact graph structure determined by the LLM is written into a **NetworkX DiGraph**, enabling rich post-process queries like shortest path, subgraph extraction, and density calculation.
+
+---
+
+## Testing
+
+14 automated tests across 4 categories:
+
+| Category | Tests | What's Verified |
+|---|---|---|
+| Schema Compliance | 5 | Node/edge fields, valid JSON, valid enums |
+| Layer Assignment | 4 | Goals=L1, Features=L2, Design=L3, no L4 |
+| Edge Correctness | 3 | `layer_crossing` auto-computed, cross-layer edges exist |
+| Extraction Precision | 2 | Entity count in range [5,15], all layers represented |
+
+```bash
+python tests/test_graph.py
+# Output: Results: 14/14 passed, 0 failed
+```
+
+---
+
+## Example Output
+
+After running `python main.py`, the generated `graph_output.json` contains a graph like:
+
+```
+Nodes: 7 (1 goal, 4 features, 2 design decisions)
+Edges: ~11 (4 implements, 3 depends_on, 4+ governs)
+Cross-layer edges: 7+
+```

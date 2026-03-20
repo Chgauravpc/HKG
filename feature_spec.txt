@@ -1,0 +1,27 @@
+Feature: Session convergence scoring
+
+Goal: Determine in real time whether a coding agent is converging toward
+a correct solution or diverging.
+
+The system wraps the agent CLI. Every shell command, file edit, git commit,
+and test run is captured as a telemetry event. From these events, three
+signals are computed continuously:
+
+ - Convergence: is the agent moving toward done, or just busy?
+ - Thrash: is it stuck in a loop, editing the same files repeatedly?
+ - Momentum: is the session accelerating or decelerating?
+
+Architecture decision: signals are computed as independent modules and
+composed into a single session score. This allows each signal to be
+calibrated independently without affecting the others.
+
+Architecture decision: the scorer is stateless per event. It receives
+an event stream and outputs a score. No session state is stored inside
+the scorer itself -- state lives in the flight recorder.
+
+The flight recorder (sploink/recorder.py) captures all events to disk.
+The scorer (sploink/metrics.py) reads from the recorder. The convergence
+engine (sploink/convergence.py) composes the three signals.
+
+Success: given a live agent session, the system outputs a convergence
+score between 0 and 1 that updates within 100ms of each new event.

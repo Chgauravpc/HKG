@@ -55,8 +55,12 @@ LAYERS AND TYPES:
     "Ensure X". Never use the same label as a Layer 2 feature node.
 - If the spec explicitly describes how outputs are combined or composed,
     extract that as a design_decision node, not just a depends_on edge.
-- If the spec explicitly describes how outputs are combined or composed,
-    extract that as a design_decision node, not just a depends_on edge.        
+- If the spec explicitly states WHERE state is stored (e.g. "state lives in X"),
+    extract that as a separate design_decision node. It governs the feature that
+    produces output AND the feature that ingests data (the event pipeline).
+- If the spec states a performance or latency requirement (e.g. "within 100ms"),
+    extract it as a design_decision node. It governs the feature responsible for
+    data ingestion / event delivery.       
 WHAT TO EXTRACT:
   - Goals: the top-level purpose + meaningful sub-goals
   - Features: the concrete, named capabilities the system exposes — specific enough
@@ -98,6 +102,13 @@ EDGES:
                  multiple features, draw a governs edge to each one individually.
                  Never assume a design decision governs only one feature unless
                  the spec explicitly scopes it that way.
+                 A composition/aggregation decision ALWAYS also governs the output
+                 feature (e.g. "session score") — not just the inputs it composes.
+                 An independence/isolation decision ALWAYS governs each component
+                 feature (e.g. each signal module) individually — draw a governs
+                 edge to each one, not just the final output.
+                 A statefulness or timing decision (stateless, latency) governs BOTH
+                 the output feature AND the data ingestion/event pipeline feature.
   feeds_data_to — A feeds_data_to B means data flows FROM A INTO B.
                  A is the producer. B is the consumer.
                  Only draw feeds_data_to edges between feature nodes you have

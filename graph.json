@@ -1,0 +1,333 @@
+{
+  "nodes": [
+    {
+      "id": "goal_1",
+      "layer": 1,
+      "type": "goal",
+      "label": "Determine convergence",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "subgoal_1",
+        "subgoal_2",
+        "subgoal_3",
+        "feature_4"
+      ]
+    },
+    {
+      "id": "subgoal_1",
+      "layer": 1,
+      "type": "goal",
+      "label": "Detect convergence signal",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "goal_1",
+        "feature_1"
+      ]
+    },
+    {
+      "id": "subgoal_2",
+      "layer": 1,
+      "type": "goal",
+      "label": "Detect thrash signal",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "goal_1",
+        "feature_2"
+      ]
+    },
+    {
+      "id": "subgoal_3",
+      "layer": 1,
+      "type": "goal",
+      "label": "Detect momentum signal",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "goal_1",
+        "feature_3"
+      ]
+    },
+    {
+      "id": "feature_1",
+      "layer": 2,
+      "type": "feature",
+      "label": "Convergence signal module",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "subgoal_1",
+        "feature_5",
+        "feature_4",
+        "design_1"
+      ]
+    },
+    {
+      "id": "feature_2",
+      "layer": 2,
+      "type": "feature",
+      "label": "Thrash signal module",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "subgoal_2",
+        "feature_5",
+        "feature_4",
+        "design_1"
+      ]
+    },
+    {
+      "id": "feature_3",
+      "layer": 2,
+      "type": "feature",
+      "label": "Momentum signal module",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "subgoal_3",
+        "feature_5",
+        "feature_4",
+        "design_1"
+      ]
+    },
+    {
+      "id": "feature_4",
+      "layer": 2,
+      "type": "feature",
+      "label": "Session score",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "goal_1",
+        "feature_1",
+        "feature_2",
+        "feature_3",
+        "design_1",
+        "design_2",
+        "design_3",
+        "design_4"
+      ]
+    },
+    {
+      "id": "feature_5",
+      "layer": 2,
+      "type": "feature",
+      "label": "Event ingestion",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "feature_1",
+        "feature_2",
+        "feature_3",
+        "design_2",
+        "design_3",
+        "design_4"
+      ]
+    },
+    {
+      "id": "design_1",
+      "layer": 3,
+      "type": "design_decision",
+      "label": "Signals are independent modules",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "feature_1",
+        "feature_2",
+        "feature_3",
+        "feature_4"
+      ]
+    },
+    {
+      "id": "design_2",
+      "layer": 3,
+      "type": "design_decision",
+      "label": "Stateless scorer",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "feature_4",
+        "feature_5"
+      ]
+    },
+    {
+      "id": "design_3",
+      "layer": 3,
+      "type": "design_decision",
+      "label": "State lives in flight recorder",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "feature_4",
+        "feature_5"
+      ]
+    },
+    {
+      "id": "design_4",
+      "layer": 3,
+      "type": "design_decision",
+      "label": "Output within 100ms",
+      "stale": false,
+      "stale_reason": null,
+      "last_modified": "2026-03-20T11:09:45.450055+00:00",
+      "connected_to": [
+        "feature_4",
+        "feature_5"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "subgoal_1",
+      "to": "goal_1",
+      "relationship": "sub_goal_of",
+      "layer_crossing": false
+    },
+    {
+      "from": "subgoal_2",
+      "to": "goal_1",
+      "relationship": "sub_goal_of",
+      "layer_crossing": false
+    },
+    {
+      "from": "subgoal_3",
+      "to": "goal_1",
+      "relationship": "sub_goal_of",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_1",
+      "to": "subgoal_1",
+      "relationship": "implements",
+      "layer_crossing": true
+    },
+    {
+      "from": "feature_2",
+      "to": "subgoal_2",
+      "relationship": "implements",
+      "layer_crossing": true
+    },
+    {
+      "from": "feature_3",
+      "to": "subgoal_3",
+      "relationship": "implements",
+      "layer_crossing": true
+    },
+    {
+      "from": "feature_4",
+      "to": "goal_1",
+      "relationship": "implements",
+      "layer_crossing": true
+    },
+    {
+      "from": "feature_1",
+      "to": "feature_5",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_2",
+      "to": "feature_5",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_3",
+      "to": "feature_5",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_4",
+      "to": "feature_1",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_4",
+      "to": "feature_2",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "feature_4",
+      "to": "feature_3",
+      "relationship": "depends_on",
+      "layer_crossing": false
+    },
+    {
+      "from": "design_1",
+      "to": "feature_1",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_1",
+      "to": "feature_2",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_1",
+      "to": "feature_3",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_1",
+      "to": "feature_4",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_2",
+      "to": "feature_4",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_2",
+      "to": "feature_5",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_3",
+      "to": "feature_4",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_3",
+      "to": "feature_5",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_4",
+      "to": "feature_4",
+      "relationship": "governs",
+      "layer_crossing": true
+    },
+    {
+      "from": "design_4",
+      "to": "feature_5",
+      "relationship": "governs",
+      "layer_crossing": true
+    }
+  ]
+}
